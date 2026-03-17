@@ -38,7 +38,7 @@ async def login(data: LoginSchema):
     return MessageToDict(res)
 
 
-@router.post("send-otp")
+@router.post("/send-otp")
 async def send_otp(data: SendOTPSchema):
     auth_service = AuthService()
     res = auth_service.send_otp(
@@ -49,7 +49,7 @@ async def send_otp(data: SendOTPSchema):
     return MessageToDict(res)
 
 
-@router.post("verify-otp")
+@router.post("/verify-otp")
 async def verify_otp(data: VerifyOTPSchema):
     auth_service = AuthService()
     res = auth_service.verify_otp(
