@@ -15,7 +15,7 @@ OUT_DIR="${ROOT_DIR}/apps/generated"
 # External proto roots
 # ----------------------------------------
 EXTERNAL_PROTO_DIRS=(
-  "${ROOT_DIR}/external/equity-flow-auth/protos"
+  "${ROOT_DIR}/external/equity-flow-startup/protos"
 )
 
 # ----------------------------------------
@@ -82,6 +82,6 @@ find "${OUT_DIR}" -maxdepth 4 -type f \
   | sed "s|${ROOT_DIR}/||" \
   | head -n 50
 
-# find "${OUT_DIR}" -type f -name "*_pb2*.py" \
-#   -print0 | xargs -0 sed -i -E \
-#   's/^import ([a-zA-Z0-9_]+_pb2) as/from app.generated import \1 as/'
+find "${OUT_DIR}" -type f -name "*_pb2*.py" \
+  -print0 | xargs -0 sed -i -E \
+  's/^import ([a-zA-Z0-9_]+_pb2) as/from app.generated import \1 as/'
