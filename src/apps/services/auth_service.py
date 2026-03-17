@@ -10,7 +10,7 @@ class AuthService:
         service_config = json.dumps({"loadBalancingConfig": [{"round_robin": {}}]})
         auth_url = config("AUTH_URL")
         self.channel = grpc.insecure_channel(
-            auth_url, options=[("grpc.lb_policy_name", "round_robin")]
+            auth_url, options=[("grpc.service_config", service_config)]
         )
         self.stub = auth_pb2_grpc.AuthStub(self.channel)
 
