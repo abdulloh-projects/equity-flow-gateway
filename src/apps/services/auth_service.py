@@ -12,7 +12,7 @@ class AuthService:
         self.channel = grpc.insecure_channel(
             auth_url, options=[("grpc.service_config", service_config)]
         )
-        self.stub = auth_pb2_grpc.AuthStub(self.channel)
+        self.stub = auth_pb2_grpc.AuthServiceStub(self.channel)
 
     def register(self, email, password, first_name, last_name, role):
         request = auth_pb2.RegisterRequest(
@@ -20,7 +20,7 @@ class AuthService:
             password=password,
             first_name=first_name,
             last_name=last_name,
-            role=role,
+            role=auth_pb2.UserRole.Value(role),
         )
         response = self.stub.Register(request)
         return response
@@ -34,18 +34,18 @@ class AuthService:
         return response
 
     def send_otp(self, email):
-        request = auth_pb2.SendOTPRequest(
+        request = auth_pb2.SendOtpRequest(
             email=email,
         )
-        response = self.stub.SendOTP(request)
+        response = self.stub.SendOtp(request)
         return response
 
     def verify_otp(self, email, otp):
-        request = auth_pb2.VerifyOTPRequest(
+        request = auth_pb2.VerifyOtpRequest(
             email=email,
             otp=otp,
         )
-        response = self.stub.VerifyOTP(request)
+        response = self.stub.VerifyOtp(request)
         return response
 
     def decode_token(self, token):
