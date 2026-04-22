@@ -19,14 +19,12 @@ jobs:
       contents: read
       packages: write
     steps:
-      # GATE 1: Checkout
       - name: Checkout with submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
           token: ${{ secrets.PAT_TOKEN || github.token }}
 
-      # GATE 2 & 3: Setup & Install
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -38,23 +36,18 @@ jobs:
           pip install flake8 pip-audit pytest pytest-asyncio grpcio-tools
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # GATE 3.5: Generate protobuf files from submodule .proto sources
       - name: Generate protobuf stubs
         run: bash src/scripts/generate_protos.sh
 
-      # GATE 4: Lint - Static syntax analysis
       - name: Static Analysis (Linter)
         run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      # GATE 5: Security Audit - Scan dependencies for CVEs
       - name: Dependency Security Scanner
         run: pip-audit
 
-      # GATE 6: Test - Execute unit and integration tests
       - name: Execute tests
         run: pytest
 
-      # POST-GAUNTLET: Build and Push
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
