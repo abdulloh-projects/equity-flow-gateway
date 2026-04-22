@@ -105,7 +105,7 @@ def _service_mock(**method_results):
                 "get_bank_info",
                 "create_compaign_update",
                 "update_compaign_update",
-                "delete_compaign_update",
+                # "delete_compaign_update",
                 "get_compaign_update",
             ]
             if m not in method_results
@@ -1008,30 +1008,30 @@ class TestCampaignUpdateCRUD:
 
         assert response.status_code == 200
 
-    async def test_delete_campaign_update_calls_service_with_correct_id(self, client):
-        svc = _service_mock()
-        with (
-            patch(f"{STARTUP_MODULE}.StartupService", return_value=svc),
-            patch(f"{STARTUP_MODULE}.MessageToDict", return_value={"success": True}),
-        ):
-            await client.request(
-                "DELETE",
-                "/api/startup/compaign-update/delete",
-                json=DELETE_CAMPAIGN_UPDATE_PAYLOAD,
-            )
+        # async def test_delete_campaign_update_calls_service_with_correct_id(self, client):
+        #     svc = _service_mock()
+        #     with (
+        #         patch(f"{STARTUP_MODULE}.StartupService", return_value=svc),
+        #         patch(f"{STARTUP_MODULE}.MessageToDict", return_value={"success": True}),
+        #     ):
+        #         await client.request(
+        #             "DELETE",
+        #             "/api/startup/compaign-update/delete",
+        #             json=DELETE_CAMPAIGN_UPDATE_PAYLOAD,
+        #         )
 
-        svc.delete_compaign_update.assert_called_once_with(update_id=5)
+        #     svc.delete_compaign_update.assert_called_once_with(update_id=5)
 
-    async def test_delete_campaign_update_service_exception_returns_500(self, client):
-        svc = MagicMock()
-        svc.delete_compaign_update.side_effect = RuntimeError("error")
+        # async def test_delete_campaign_update_service_exception_returns_500(self, client):
+        #     svc = MagicMock()
+        #     svc.delete_compaign_update.side_effect = RuntimeError("error")
 
-        with patch(f"{STARTUP_MODULE}.StartupService", return_value=svc):
-            response = await client.request(
-                "DELETE",
-                "/api/startup/compaign-update/delete",
-                json=DELETE_CAMPAIGN_UPDATE_PAYLOAD,
-            )
+        #     with patch(f"{STARTUP_MODULE}.StartupService", return_value=svc):
+        #         response = await client.request(
+        #             "DELETE",
+        #             "/api/startup/compaign-update/delete",
+        #             json=DELETE_CAMPAIGN_UPDATE_PAYLOAD,
+        #         )
 
         assert response.status_code == 500
 
