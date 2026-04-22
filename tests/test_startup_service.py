@@ -6,16 +6,20 @@ Strategy
 * `grpc.insecure_channel` is patched so no real network call is made.
 * `startup_pb2_grpc.StartupServiceStub` is patched so we control the stub
   that the service holds internally.
+* We do NOT patch protobuf request constructors (startup_pb2.XxxRequest).
+  In protobuf 4.x+ the generated classes live in the descriptor pool and are
+  NOT in the module __dict__, which makes unittest.mock.patch fail with
+  AttributeError even though the class is fully usable.
+  Instead we let the service build real protobuf request objects and then
+  inspect what was actually passed to the mock stub via call_args.
 * Every public method is covered for the happy path and for the case where
   the gRPC stub raises an exception.
-* datetime objects are verified at the call-site level (the endpoint layer
-  converts ISO-strings to datetime before handing them to the service).
 """
 
 import os
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -84,23 +88,11 @@ class TestCreateStartup:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_request_fields(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.CreateStartup.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.CreateStartupRequest") as mock_req:
-            svc.create_startup(
-                user_id=42,
-                name="GreenTech",
-                location="Tashkent",
-                description="Sustainable energy",
-                website_url="https://greentech.uz",
-                team_size=10,
-                category_id=3,
-                stage_id=1,
-                founded_at=FOUNDED_AT,
-            )
-
-        mock_req.assert_called_once_with(
+        svc.create_startup(
             user_id=42,
             name="GreenTech",
             location="Tashkent",
@@ -111,6 +103,34 @@ class TestCreateStartup:
             stage_id=1,
             founded_at=FOUNDED_AT,
         )
+
+        stub.CreateStartup.assert_called_once()
+
+    def test_request_contains_correct_scalar_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.CreateStartup.return_value = MagicMock()
+
+        svc.create_startup(
+            user_id=42,
+            name="GreenTech",
+            location="Tashkent",
+            description="Sustainable energy",
+            website_url="https://greentech.uz",
+            team_size=10,
+            category_id=3,
+            stage_id=1,
+            founded_at=FOUNDED_AT,
+        )
+
+        req = stub.CreateStartup.call_args[0][0]
+        assert req.user_id == 42
+        assert req.name == "GreenTech"
+        assert req.location == "Tashkent"
+        assert req.description == "Sustainable energy"
+        assert req.website_url == "https://greentech.uz"
+        assert req.team_size == 10
+        assert req.category_id == 3
+        assert req.stage_id == 1
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -149,22 +169,11 @@ class TestUpdateStartup:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_startup_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.UpdateStartup.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.UpdateStartupRequest") as mock_req:
-            svc.update_startup(
-                startup_id=7,
-                name="GreenTech Ltd",
-                location="Tashkent",
-                description="Updated",
-                website_url="https://greentech.uz",
-                category_id=3,
-                stage_id=2,
-                founded_at=FOUNDED_AT,
-            )
-
-        mock_req.assert_called_once_with(
+        svc.update_startup(
             startup_id=7,
             name="GreenTech Ltd",
             location="Tashkent",
@@ -175,23 +184,49 @@ class TestUpdateStartup:
             founded_at=FOUNDED_AT,
         )
 
-    def test_update_with_none_founded_at(self):
+        stub.UpdateStartup.assert_called_once()
+
+    def test_request_contains_correct_startup_id(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.UpdateStartup.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.UpdateStartupRequest") as mock_req:
-            svc.update_startup(
-                startup_id=7,
-                name="GreenTech Ltd",
-                location="Tashkent",
-                description="Updated",
-                website_url="https://greentech.uz",
-                category_id=3,
-                stage_id=2,
-                founded_at=None,
-            )
+        svc.update_startup(
+            startup_id=7,
+            name="GreenTech Ltd",
+            location="Tashkent",
+            description="Updated",
+            website_url="https://greentech.uz",
+            category_id=3,
+            stage_id=2,
+            founded_at=FOUNDED_AT,
+        )
 
-        kwargs = mock_req.call_args.kwargs
-        assert kwargs["founded_at"] is None
+        req = stub.UpdateStartup.call_args[0][0]
+        assert req.startup_id == 7
+        assert req.name == "GreenTech Ltd"
+        assert req.location == "Tashkent"
+        assert req.category_id == 3
+        assert req.stage_id == 2
+
+    def test_update_with_none_founded_at_does_not_raise(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.UpdateStartup.return_value = MagicMock()
+
+        # Should not raise - founded_at is optional in the proto
+        svc.update_startup(
+            startup_id=7,
+            name="GreenTech Ltd",
+            location="Tashkent",
+            description="Updated",
+            website_url="https://greentech.uz",
+            category_id=3,
+            stage_id=2,
+            founded_at=None,
+        )
+
+        stub.UpdateStartup.assert_called_once()
+        req = stub.UpdateStartup.call_args[0][0]
+        assert req.startup_id == 7
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -220,14 +255,22 @@ class TestDeleteStartup:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.DeleteStartup.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.DeleteStartupRequest") as mock_req:
-            svc.delete_startup(startup_id=7)
+        svc.delete_startup(startup_id=7)
 
-        mock_req.assert_called_once_with(startup_id=7)
         stub.DeleteStartup.assert_called_once()
+
+    def test_request_contains_correct_startup_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.DeleteStartup.return_value = MagicMock()
+
+        svc.delete_startup(startup_id=7)
+
+        req = stub.DeleteStartup.call_args[0][0]
+        assert req.startup_id == 7
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -247,14 +290,22 @@ class TestGetStartup:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.GetStartup.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.GetStartupRequest") as mock_req:
-            svc.get_startup(startup_id=7)
+        svc.get_startup(startup_id=7)
 
-        mock_req.assert_called_once_with(startup_id=7)
         stub.GetStartup.assert_called_once()
+
+    def test_request_contains_correct_startup_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.GetStartup.return_value = MagicMock()
+
+        svc.get_startup(startup_id=7)
+
+        req = stub.GetStartup.call_args[0][0]
+        assert req.startup_id == 7
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -309,14 +360,32 @@ class TestCreateCampaign:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_fields(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.CreateCompaigns.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.CreateCompaignsRequest") as mock_req:
-            svc.create_compaigns(**CAMPAIGN_FIELDS)
+        svc.create_compaigns(**CAMPAIGN_FIELDS)
 
-        mock_req.assert_called_once_with(**CAMPAIGN_FIELDS)
         stub.CreateCompaigns.assert_called_once()
+
+    def test_request_contains_correct_scalar_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.CreateCompaigns.return_value = MagicMock()
+
+        svc.create_compaigns(**CAMPAIGN_FIELDS)
+
+        req = stub.CreateCompaigns.call_args[0][0]
+        assert req.startup_id == 7
+        assert req.target_amount == 500_000.0
+        assert req.min_investment == 1_000.0
+        assert req.revenue == 80_000.0
+        assert req.revenue_share == 15.0
+        assert req.burn_rate == 12_000.0
+        assert req.runway == 18.0
+        assert req.active_customers == 250.0
+        assert req.valuation == 3_000_000.0
+        assert req.gross_margin == 60.0
+        assert req.status == "OPEN"
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -336,14 +405,24 @@ class TestUpdateCampaign:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_campaign_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.UpdateCompaigns.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.UpdateCompaignsRequest") as mock_req:
-            svc.update_compaigns(**UPDATE_CAMPAIGN_FIELDS)
+        svc.update_compaigns(**UPDATE_CAMPAIGN_FIELDS)
 
-        kwargs = mock_req.call_args.kwargs
-        assert kwargs["campaign_id"] == 12
+        stub.UpdateCompaigns.assert_called_once()
+
+    def test_request_contains_correct_campaign_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.UpdateCompaigns.return_value = MagicMock()
+
+        svc.update_compaigns(**UPDATE_CAMPAIGN_FIELDS)
+
+        req = stub.UpdateCompaigns.call_args[0][0]
+        assert req.campaign_id == 12
+        assert req.target_amount == 600_000.0
+        assert req.status == "OPEN"
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -363,13 +442,22 @@ class TestDeleteCampaign:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.DeleteCompaigns.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.DeleteCompaignsRequest") as mock_req:
-            svc.delete_compaigns(campaign_id=12)
+        svc.delete_compaigns(campaign_id=12)
 
-        mock_req.assert_called_once_with(campaign_id=12)
+        stub.DeleteCompaigns.assert_called_once()
+
+    def test_request_contains_correct_campaign_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.DeleteCompaigns.return_value = MagicMock()
+
+        svc.delete_compaigns(campaign_id=12)
+
+        req = stub.DeleteCompaigns.call_args[0][0]
+        assert req.campaign_id == 12
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -389,13 +477,22 @@ class TestGetCampaign:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.GetCompaigns.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.GetCompaignsRequest") as mock_req:
-            svc.get_compaigns(campaign_id=12)
+        svc.get_compaigns(campaign_id=12)
 
-        mock_req.assert_called_once_with(campaign_id=12)
+        stub.GetCompaigns.assert_called_once()
+
+    def test_request_contains_correct_campaign_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.GetCompaigns.return_value = MagicMock()
+
+        svc.get_compaigns(campaign_id=12)
+
+        req = stub.GetCompaigns.call_args[0][0]
+        assert req.campaign_id == 12
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -434,14 +531,25 @@ class TestCreateBankInfo:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_fields(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.CreateBankInfo.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.CreateBankInfoRequest") as mock_req:
-            svc.create_bank_info(**BANK_INFO_FIELDS)
+        svc.create_bank_info(**BANK_INFO_FIELDS)
 
-        mock_req.assert_called_once_with(**BANK_INFO_FIELDS)
         stub.CreateBankInfo.assert_called_once()
+
+    def test_request_contains_correct_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.CreateBankInfo.return_value = MagicMock()
+
+        svc.create_bank_info(**BANK_INFO_FIELDS)
+
+        req = stub.CreateBankInfo.call_args[0][0]
+        assert req.startup_id == 7
+        assert req.mfo == "00873"
+        assert req.account_number == "20208000205738291001"
+        assert req.receipant_name == "GreenTech LLC"
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -461,16 +569,25 @@ class TestUpdateBankInfo:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_bank_info_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.UpdateBankInfo.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.UpdateBankInfoRequest") as mock_req:
-            svc.update_bank_info(**UPDATE_BANK_INFO_FIELDS)
+        svc.update_bank_info(**UPDATE_BANK_INFO_FIELDS)
 
-        kwargs = mock_req.call_args.kwargs
-        assert kwargs["bank_info_id"] == 3
-        assert kwargs["mfo"] == "00874"
-        assert kwargs["receipant_name"] == "GreenTech Holdings"
+        stub.UpdateBankInfo.assert_called_once()
+
+    def test_request_contains_correct_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.UpdateBankInfo.return_value = MagicMock()
+
+        svc.update_bank_info(**UPDATE_BANK_INFO_FIELDS)
+
+        req = stub.UpdateBankInfo.call_args[0][0]
+        assert req.bank_info_id == 3
+        assert req.mfo == "00874"
+        assert req.account_number == "20208000205738291002"
+        assert req.receipant_name == "GreenTech Holdings"
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -490,13 +607,22 @@ class TestDeleteBankInfo:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.DeleteBankInfo.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.DeleteBankInfoRequest") as mock_req:
-            svc.delete_bank_info(bank_info_id=3)
+        svc.delete_bank_info(bank_info_id=3)
 
-        mock_req.assert_called_once_with(bank_info_id=3)
+        stub.DeleteBankInfo.assert_called_once()
+
+    def test_request_contains_correct_bank_info_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.DeleteBankInfo.return_value = MagicMock()
+
+        svc.delete_bank_info(bank_info_id=3)
+
+        req = stub.DeleteBankInfo.call_args[0][0]
+        assert req.bank_info_id == 3
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -516,13 +642,22 @@ class TestGetBankInfo:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.GetBankInfo.return_value = MagicMock()
 
-        with patch(f"{SERVICE_MODULE}.startup_pb2.GetBankInfoRequest") as mock_req:
-            svc.get_bank_info(bank_info_id=3)
+        svc.get_bank_info(bank_info_id=3)
 
-        mock_req.assert_called_once_with(bank_info_id=3)
+        stub.GetBankInfo.assert_called_once()
+
+    def test_request_contains_correct_bank_info_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.GetBankInfo.return_value = MagicMock()
+
+        svc.get_bank_info(bank_info_id=3)
+
+        req = stub.GetBankInfo.call_args[0][0]
+        assert req.bank_info_id == 3
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -551,23 +686,32 @@ class TestCreateCampaignUpdate:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_fields(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.CreateCompaignUpdate.return_value = MagicMock()
 
-        with patch(
-            f"{SERVICE_MODULE}.startup_pb2.CreateCompaignUpdateRequest"
-        ) as mock_req:
-            svc.create_compaign_update(
-                compaign_id=12,
-                title="Milestone reached",
-                body="We closed our seed round.",
-            )
-
-        mock_req.assert_called_once_with(
+        svc.create_compaign_update(
             compaign_id=12,
             title="Milestone reached",
             body="We closed our seed round.",
         )
+
+        stub.CreateCompaignUpdate.assert_called_once()
+
+    def test_request_contains_correct_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.CreateCompaignUpdate.return_value = MagicMock()
+
+        svc.create_compaign_update(
+            compaign_id=12,
+            title="Milestone reached",
+            body="We closed our seed round.",
+        )
+
+        req = stub.CreateCompaignUpdate.call_args[0][0]
+        assert req.compaign_id == 12
+        assert req.title == "Milestone reached"
+        assert req.body == "We closed our seed round."
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -595,21 +739,32 @@ class TestUpdateCampaignUpdate:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_update_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.UpdateCompaignUpdate.return_value = MagicMock()
 
-        with patch(
-            f"{SERVICE_MODULE}.startup_pb2.UpdateCompaignUpdateRequest"
-        ) as mock_req:
-            svc.update_compaign_update(
-                update_id=5,
-                title="Revised",
-                body="Revised body.",
-            )
+        svc.update_compaign_update(
+            update_id=5,
+            title="Revised",
+            body="Revised body.",
+        )
 
-        kwargs = mock_req.call_args.kwargs
-        assert kwargs["update_id"] == 5
-        assert kwargs["title"] == "Revised"
+        stub.UpdateCompaignUpdate.assert_called_once()
+
+    def test_request_contains_correct_fields(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.UpdateCompaignUpdate.return_value = MagicMock()
+
+        svc.update_compaign_update(
+            update_id=5,
+            title="Revised",
+            body="Revised body.",
+        )
+
+        req = stub.UpdateCompaignUpdate.call_args[0][0]
+        assert req.update_id == 5
+        assert req.title == "Revised"
+        assert req.body == "Revised body."
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -629,15 +784,22 @@ class TestDeleteCampaignUpdate:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.DeleteCompaignUpdate.return_value = MagicMock()
 
-        with patch(
-            f"{SERVICE_MODULE}.startup_pb2.DeleteCompaignUpdateRequest"
-        ) as mock_req:
-            svc.delete_compaign_update(update_id=5)
+        svc.delete_compaign_update(update_id=5)
 
-        mock_req.assert_called_once_with(update_id=5)
+        stub.DeleteCompaignUpdate.assert_called_once()
+
+    def test_request_contains_correct_update_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.DeleteCompaignUpdate.return_value = MagicMock()
+
+        svc.delete_compaign_update(update_id=5)
+
+        req = stub.DeleteCompaignUpdate.call_args[0][0]
+        assert req.update_id == 5
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
@@ -657,15 +819,22 @@ class TestGetCampaignUpdate:
 
         assert result is expected
 
-    def test_calls_stub_with_correct_id(self):
+    def test_stub_is_called_once(self):
         svc, stub = _build_service_with_mock_stub()
+        stub.GetCompaignUpdate.return_value = MagicMock()
 
-        with patch(
-            f"{SERVICE_MODULE}.startup_pb2.GetCompaignUpdateRequest"
-        ) as mock_req:
-            svc.get_compaign_update(update_id=5)
+        svc.get_compaign_update(update_id=5)
 
-        mock_req.assert_called_once_with(update_id=5)
+        stub.GetCompaignUpdate.assert_called_once()
+
+    def test_request_contains_correct_update_id(self):
+        svc, stub = _build_service_with_mock_stub()
+        stub.GetCompaignUpdate.return_value = MagicMock()
+
+        svc.get_compaign_update(update_id=5)
+
+        req = stub.GetCompaignUpdate.call_args[0][0]
+        assert req.update_id == 5
 
     def test_grpc_exception_propagates(self):
         svc, stub = _build_service_with_mock_stub()
