@@ -15,6 +15,7 @@ OUT_DIR="${ROOT_DIR}/apps/generated"
 # External proto roots
 # ----------------------------------------
 EXTERNAL_PROTO_DIRS=(
+  "${ROOT_DIR}/external/equity-flow-auth/protos"
   "${ROOT_DIR}/external/equity-flow-startup/protos"
 )
 
