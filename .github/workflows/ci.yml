@@ -1,0 +1,66 @@
+name: Build and push Docker image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # GATE 1: Checkout
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
+
+      # GATE 2 & 3: Setup & Install
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pip-audit pytest pytest-asyncio
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # GATE 4: Lint - Static syntax analysis
+      - name: Static Analysis (Linter)
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      # GATE 5: Security Audit - Scan dependencies for CVEs
+      - name: Dependency Security Scanner
+        run: pip-audit
+
+      # GATE 6: Test - Execute unit and integration tests
+      - name: Execute tests
+        run: pytest
+
+      # POST-GAUNTLET: Build and Push
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

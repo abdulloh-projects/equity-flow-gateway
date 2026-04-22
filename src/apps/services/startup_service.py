@@ -12,7 +12,7 @@ class StartupService:
         self.channel = grpc.insecure_channel(
             startup_url, options=[("grpc.service_config", service_config)]
         )
-        self.stub = startup_pb2_grpc.StartupStub(self.channel)
+        self.stub = startup_pb2_grpc.StartupServiceStub(self.channel)
 
     def create_startup(
         self,
@@ -39,7 +39,34 @@ class StartupService:
         )
         return self.stub.CreateStartup(request)
 
-    def create_compaign(
+    def update_startup(
+        self,
+        startup_id,
+        name,
+        location,
+        description,
+        website_url,
+        category_id,
+        stage_id,
+        founded_at,
+    ):
+        request = startup_pb2.UpdateStartupRequest(
+            startup_id=startup_id,
+            name=name,
+            location=location,
+            description=description,
+            website_url=website_url,
+            category_id=category_id,
+            stage_id=stage_id,
+            founded_at=founded_at,
+        )
+        return self.stub.UpdateStartup(request)
+
+    def delete_startup(self, startup_id):
+        request = startup_pb2.DeleteStartupRequest(startup_id=startup_id)
+        return self.stub.DeleteStartup(request)
+
+    def create_compaigns(
         self,
         startup_id,
         target_amount,
@@ -54,7 +81,7 @@ class StartupService:
         status,
         deadline,
     ):
-        request = startup_pb2.CreateCompaignRequest(
+        request = startup_pb2.CreateCompaignsRequest(
             startup_id=startup_id,
             target_amount=target_amount,
             min_investment=min_investment,
@@ -68,7 +95,42 @@ class StartupService:
             status=status,
             deadline=deadline,
         )
-        return self.stub.CreateCompaign(request)
+        return self.stub.CreateCompaigns(request)
+
+    def update_compaigns(
+        self,
+        campaign_id,
+        target_amount,
+        min_investment,
+        revenue,
+        revenue_share,
+        burn_rate,
+        runway,
+        active_customers,
+        valuation,
+        gross_margin,
+        status,
+        deadline,
+    ):
+        request = startup_pb2.UpdateCompaignsRequest(
+            campaign_id=campaign_id,
+            target_amount=target_amount,
+            min_investment=min_investment,
+            revenue=revenue,
+            revenue_share=revenue_share,
+            burn_rate=burn_rate,
+            runway=runway,
+            active_customers=active_customers,
+            valuation=valuation,
+            gross_margin=gross_margin,
+            status=status,
+            deadline=deadline,
+        )
+        return self.stub.UpdateCompaigns(request)
+
+    def delete_compaigns(self, campaign_id):
+        request = startup_pb2.DeleteCompaignsRequest(campaign_id=campaign_id)
+        return self.stub.DeleteCompaigns(request)
 
     def create_bank_info(
         self,
@@ -85,6 +147,19 @@ class StartupService:
         )
         return self.stub.CreateBankInfo(request)
 
+    def update_bank_info(self, bank_info_id, mfo, account_number, receipant_name):
+        request = startup_pb2.UpdateBankInfoRequest(
+            bank_info_id=bank_info_id,
+            mfo=mfo,
+            account_number=account_number,
+            receipant_name=receipant_name,
+        )
+        return self.stub.UpdateBankInfo(request)
+
+    def delete_bank_info(self, bank_info_id):
+        request = startup_pb2.DeleteBankInfoRequest(bank_info_id=bank_info_id)
+        return self.stub.DeleteBankInfo(request)
+
     def create_compaign_update(self, compaign_id, title, body):
         request = startup_pb2.CreateCompaignUpdateRequest(
             compaign_id=compaign_id,
@@ -92,3 +167,31 @@ class StartupService:
             body=body,
         )
         return self.stub.CreateCompaignUpdate(request)
+
+    def update_compaign_update(self, update_id, title, body):
+        request = startup_pb2.UpdateCompaignUpdateRequest(
+            update_id=update_id,
+            title=title,
+            body=body,
+        )
+        return self.stub.UpdateCompaignUpdate(request)
+
+    def delete_compaign_update(self, update_id):
+        request = startup_pb2.DeleteCompaignUpdateRequest(update_id=update_id)
+        return self.stub.DeleteCompaignUpdate(request)
+
+    def get_startup(self, startup_id):
+        request = startup_pb2.GetStartupRequest(startup_id=startup_id)
+        return self.stub.GetStartup(request)
+
+    def get_compaigns(self, campaign_id):
+        request = startup_pb2.GetCompaignsRequest(campaign_id=campaign_id)
+        return self.stub.GetCompaigns(request)
+
+    def get_bank_info(self, bank_info_id):
+        request = startup_pb2.GetBankInfoRequest(bank_info_id=bank_info_id)
+        return self.stub.GetBankInfo(request)
+
+    def get_compaign_update(self, update_id):
+        request = startup_pb2.GetCompaignUpdateRequest(update_id=update_id)
+        return self.stub.GetCompaignUpdate(request)

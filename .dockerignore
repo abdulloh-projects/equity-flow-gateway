@@ -1,16 +1,17 @@
 .idea/
 .vscode/
 
+.git/
+.github/
+
 env/
 venv/
 .venv/
 
 __pycache__/
 
-*pb2*.py
-
 .env
 .DS_Store
 
-db**.sqlite3
-/.pytest_cache
+.gitignore
+.gitmodules
