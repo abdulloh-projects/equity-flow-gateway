@@ -35,8 +35,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pip-audit pytest pytest-asyncio
+          pip install flake8 pip-audit pytest pytest-asyncio grpcio-tools
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # GATE 3.5: Generate protobuf files from submodule .proto sources
+      - name: Generate protobuf stubs
+        run: bash src/scripts/generate_protos.sh
 
       # GATE 4: Lint - Static syntax analysis
       - name: Static Analysis (Linter)
