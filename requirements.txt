@@ -3,3 +3,7 @@ uvicorn==0.42.0
 python-decouple
 grpcio
 httpx
+
+# RAG / Chatbot
+ollama
+chromadb

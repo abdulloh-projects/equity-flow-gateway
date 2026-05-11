@@ -225,6 +225,35 @@ async def delete_compaign_update(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/")
+async def list_startups(page: int = 1, limit: int = 9):
+    try:
+        result = StartupService().list_startups(page=page, limit=limit)
+        return MessageToDict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/my")
+async def get_my_startups(user_id: str = Depends(get_current_user)):
+    try:
+        result = StartupService().get_startups_by_user(user_id=int(user_id))
+        return MessageToDict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{startup_id}/campaigns")
+async def list_campaigns_by_startup(
+    startup_id: int, user_id: str = Depends(get_current_user)
+):
+    try:
+        result = StartupService().list_campaigns_by_startup(startup_id=startup_id)
+        return MessageToDict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{startup_id}")
 async def get_startup(startup_id: int, user_id: str = Depends(get_current_user)):
     try:

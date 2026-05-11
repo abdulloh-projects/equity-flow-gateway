@@ -195,3 +195,17 @@ class StartupService:
     def get_compaign_update(self, update_id):
         request = startup_pb2.GetCompaignUpdateRequest(update_id=update_id)
         return self.stub.GetCompaignUpdate(request)
+
+    def list_startups(self, page: int = 1, limit: int = 9, status: str = None):
+        request = startup_pb2.ListStartupsRequest(
+            page=page, limit=limit, status=status or ""
+        )
+        return self.stub.ListStartups(request)
+
+    def get_startups_by_user(self, user_id: int):
+        request = startup_pb2.GetStartupsByUserRequest(user_id=user_id)
+        return self.stub.GetStartupsByUser(request)
+
+    def list_campaigns_by_startup(self, startup_id: int):
+        request = startup_pb2.ListCampaignsByStartupRequest(startup_id=startup_id)
+        return self.stub.ListCampaignsByStartup(request)

@@ -111,3 +111,17 @@ class GetBankInfoRequest(BaseModel):
 
 class GetCompaignUpdateRequest(BaseModel):
     update_id: int = Field(...)
+
+
+class ListStartupsRequest(BaseModel):
+    page: int = 1
+    limit: int = 9
+    status: Optional[str] = None
+
+
+class GetStartupsByUserRequest(BaseModel):
+    user_id: int = Field(...)
+
+
+class ListCampaignsByStartupRequest(BaseModel):
+    startup_id: int = Field(...)
