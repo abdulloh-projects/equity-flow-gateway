@@ -14,10 +14,15 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir pytest pytest-asyncio httpx
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /app/src ./src
 
-COPY --from=builder /app/src .
+COPY tests ./tests
+COPY pytest.ini .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+ENV PYTHONPATH=/app/src
+
+CMD ["uvicorn", "apps.main:app", "--host", "0.0.0.0", "--port", "8080"]
