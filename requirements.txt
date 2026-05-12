@@ -7,3 +7,6 @@ httpx
 # RAG / Chatbot
 ollama
 chromadb
+
+# Caching
+redis[asyncio]
