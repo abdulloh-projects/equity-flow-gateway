@@ -9,11 +9,23 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     token = credentials.credentials
-    auth_service = AuthService()
-    res = auth_service.decode_token(token=token)
+    try:
+        auth_service = AuthService()
+        res = auth_service.decode_token(token=token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
     if not res.success:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
-    return res.data["user_id"]
+    user_id = res.data.get("user_id", "")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+    return user_id
