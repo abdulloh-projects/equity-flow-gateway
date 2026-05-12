@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from .endpoints import auth, startup
+from .endpoints import auth, chatbot, startup
 
 router = APIRouter()
 
-
 router.include_router(auth.router)
 router.include_router(startup.router)
+router.include_router(chatbot.router)
