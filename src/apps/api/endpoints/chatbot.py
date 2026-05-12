@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 from apps.schemas.chatbot_schema import (
@@ -9,6 +10,7 @@ from apps.schemas.chatbot_schema import (
 )
 from apps.services.rag_service import RAGService
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chatbot"])
@@ -21,9 +23,6 @@ def _get_rag() -> RAGService:
     if _rag is None:
         _rag = RAGService()
     return _rag
-
-
-# ── Chat ──────────────────────────────────────────────────────────────────────
 
 
 @router.post("/", response_model=ChatResponse, summary="Ask the Equity Flow assistant")
@@ -52,7 +51,36 @@ async def chat(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# ── Knowledge-base management ─────────────────────────────────────────────────
+@router.post("/stream", summary="Streaming chat with the Equity Flow assistant")
+async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    """
+    Same as POST /chat/ but returns a text/event-stream.
+    Each SSE event carries a JSON object:
+      {"type": "token", "text": "..."}   — one Ollama token
+      {"type": "done", "session_id": "...", "sources": [...]}  — final event
+    """
+
+    def _sse_generator():
+        try:
+            for token, sid, sources in _get_rag().chat_stream(
+                request.message, request.session_id
+            ):
+                if sources is not None:
+                    payload = json.dumps(
+                        {"type": "done", "session_id": sid, "sources": sources}
+                    )
+                else:
+                    payload = json.dumps({"type": "token", "text": token})
+                yield f"data: {payload}\n\n"
+        except Exception as exc:
+            logger.exception("Stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        _sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post(
@@ -80,9 +108,6 @@ async def init_knowledge_base(force: bool = False) -> InitResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# ── Session management ────────────────────────────────────────────────────────
-
-
 @router.delete("/session/{session_id}", summary="Clear a conversation session")
 async def clear_session(session_id: str) -> dict:
     """Delete the stored conversation history for the given session."""
@@ -90,9 +115,6 @@ async def clear_session(session_id: str) -> dict:
     if not cleared:
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"message": f"Session '{session_id}' cleared."}
-
-
-# ── Health ────────────────────────────────────────────────────────────────────
 
 
 @router.get("/health", response_model=HealthResponse, summary="Ollama health check")

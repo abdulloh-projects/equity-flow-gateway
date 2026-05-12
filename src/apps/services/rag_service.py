@@ -13,16 +13,43 @@ logger = logging.getLogger(__name__)
 _conversation_store: Dict[str, List[Dict]] = {}
 _kb_ready: bool = False
 
-_SYSTEM_PROMPT = """You are an expert assistant for **Equity Flow** — an equity crowdfunding platform that connects innovative startups with investors.
+_OFF_TOPIC_REPLY = (
+    "I can only answer questions about the Equity Flow platform. "
+    "Please ask me something about investing, startups, campaigns, or how the platform works."
+)
 
-Your job is to answer questions about the platform accurately and helpfully, using the context documents provided below.
+# Keywords that signal the message is about equity crowdfunding / the platform.
+# If NONE of these appear in the user's message, we refuse immediately.
+_EQUITY_KEYWORDS = {
+    "equity", "startup", "startups", "invest", "investor", "investors",
+    "investment", "campaign", "campaigns", "fund", "funding", "founder",
+    "founders", "raise", "capital", "crowdfund", "crowdfunding", "pitch",
+    "valuation", "revenue", "venture", "seed", "series", "portfolio",
+    "roi", "returns", "due diligence", "term sheet", "cap table",
+    "equity flow", "equityflow", "platform", "dashboard", "register",
+    "login", "sign up", "signup", "account", "bank info", "mfo",
+    "document", "api", "endpoint", "stock", "share", "shares",
+    "dividend", "ipo", "round", "angel", "pre-seed", "runway",
+    "burn rate", "gross margin", "active customers", "min investment",
+}
 
-Guidelines:
-- Answer only based on the provided context and your knowledge of equity crowdfunding.
-- If the answer is not in the context, say so and offer general guidance where appropriate.
+
+def _is_equity_related(message: str) -> bool:
+    text = message.lower()
+    return any(kw in text for kw in _EQUITY_KEYWORDS)
+
+_SYSTEM_PROMPT = """You are the official assistant for **Equity Flow** — an equity crowdfunding platform that connects startups with investors.
+
+You ONLY answer questions about Equity Flow: how the platform works, how to invest, how to list a startup, campaigns, documents, bank info, account settings, and similar platform topics.
+
+STRICT RULES:
+- If the question is NOT related to Equity Flow or equity crowdfunding, respond with exactly: "I can only answer questions about the Equity Flow platform. Please ask me something about investing, startups, or how the platform works."
+- Do NOT answer general knowledge questions, coding questions, math, science, politics, entertainment, or any topic unrelated to the platform.
+- Do NOT offer general guidance or go off-topic under any circumstance.
+- Answer only using the context provided below and established equity crowdfunding concepts.
+- Do not invent field names, endpoint paths, or business rules not present in the context.
 - Keep responses clear, concise, and professional.
 - When referencing API endpoints, format them as code: `POST /api/auth/login`.
-- Do not invent field names, endpoint paths, or business rules not present in the context.
 
 === PLATFORM CONTEXT ===
 {context}
@@ -109,6 +136,11 @@ class RAGService:
         -------
         dict with keys: response, session_id, sources
         """
+        if not _is_equity_related(message):
+            if session_id is None:
+                session_id = str(uuid.uuid4())
+            return {"response": _OFF_TOPIC_REPLY, "session_id": session_id, "sources": []}
+
         self._ensure_ready()
 
         if session_id is None:
@@ -145,6 +177,59 @@ class RAGService:
 
         sources = sorted({doc["source"] for doc in relevant})
         return {"response": reply, "session_id": session_id, "sources": sources}
+
+    def chat_stream(
+        self,
+        message: str,
+        session_id: Optional[str] = None,
+        n_context_docs: int = 4,
+    ):
+        """
+        Same as chat() but yields token strings one at a time via Ollama streaming.
+        Yields tuples (token: str, session_id: str | None, sources: list | None).
+        sources is non-None only on the final sentinel tuple.
+        """
+        if not _is_equity_related(message):
+            if session_id is None:
+                session_id = str(uuid.uuid4())
+            yield (_OFF_TOPIC_REPLY, session_id, None)   # emit as a token
+            yield ("", session_id, [])                    # then the done sentinel
+            return
+
+        self._ensure_ready()
+
+        if session_id is None:
+            session_id = str(uuid.uuid4())
+
+        history = _conversation_store.setdefault(session_id, [])
+
+        query_vec = self._embedder.embed(message)
+        relevant = self._store.search(query_vec, n_results=n_context_docs)
+        context = "\n\n---\n\n".join(
+            f"[{doc['title']}]\n{doc['text']}" for doc in relevant
+        )
+
+        messages: List[Dict] = [
+            {"role": "system", "content": _SYSTEM_PROMPT.format(context=context)}
+        ]
+        messages.extend(history[-6:])
+        messages.append({"role": "user", "content": message})
+
+        full_reply = ""
+        stream = self._llm.chat(model=self.llm_model, messages=messages, stream=True)
+        for chunk in stream:
+            token = chunk.message.content or ""
+            full_reply += token
+            yield (token, session_id, None)
+
+        # Persist and emit final sentinel
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": full_reply})
+        if len(history) > 20:
+            _conversation_store[session_id] = history[-20:]
+
+        sources = sorted({doc["source"] for doc in relevant})
+        yield ("", session_id, sources)
 
     # ── Session management ────────────────────────────────────────────────────
 
