@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_URL: localhost:50051
+      STARTUP_URL: localhost:50052
+      ORIGINS: http://localhost:3000
+      OLLAMA_URL: http://localhost:11434
+      CHROMA_DB_PATH: /app/chroma_db
+      LLM_MODEL: qwen2.5:3b
+      EMBED_MODEL: nomic-embed-text

@@ -100,33 +100,49 @@ class StartupService:
     def update_compaigns(
         self,
         campaign_id,
-        target_amount,
-        min_investment,
-        revenue,
-        revenue_share,
-        burn_rate,
-        runway,
-        active_customers,
-        valuation,
-        gross_margin,
-        status,
-        deadline,
+        target_amount=None,
+        min_investment=None,
+        revenue=None,
+        revenue_share=None,
+        burn_rate=None,
+        runway=None,
+        active_customers=None,
+        valuation=None,
+        gross_margin=None,
+        status=None,
+        deadline=None,
+        raised_amount=None,
     ):
-        request = startup_pb2.UpdateCompaignsRequest(
-            campaign_id=campaign_id,
-            target_amount=target_amount,
-            min_investment=min_investment,
-            revenue=revenue,
-            revenue_share=revenue_share,
-            burn_rate=burn_rate,
-            runway=runway,
-            active_customers=active_customers,
-            valuation=valuation,
-            gross_margin=gross_margin,
-            status=status,
-            deadline=deadline,
-        )
+        kwargs = {"campaign_id": campaign_id}
+        if target_amount is not None: kwargs["target_amount"] = target_amount
+        if min_investment is not None: kwargs["min_investment"] = min_investment
+        if revenue is not None: kwargs["revenue"] = revenue
+        if revenue_share is not None: kwargs["revenue_share"] = revenue_share
+        if burn_rate is not None: kwargs["burn_rate"] = burn_rate
+        if runway is not None: kwargs["runway"] = runway
+        if active_customers is not None: kwargs["active_customers"] = active_customers
+        if valuation is not None: kwargs["valuation"] = valuation
+        if gross_margin is not None: kwargs["gross_margin"] = gross_margin
+        if status is not None: kwargs["status"] = status
+        if deadline is not None: kwargs["deadline"] = deadline
+        if raised_amount is not None: kwargs["raised_amount"] = raised_amount
+        request = startup_pb2.UpdateCompaignsRequest(**kwargs)
         return self.stub.UpdateCompaigns(request)
+
+    def record_investment(self, investor_id: str, startup_id: int, campaign_id: int, amount: float, message: str = None):
+        kwargs = dict(investor_id=investor_id, startup_id=startup_id, campaign_id=campaign_id, amount=amount)
+        if message:
+            kwargs["message"] = message
+        request = startup_pb2.RecordInvestmentRequest(**kwargs)
+        return self.stub.RecordInvestment(request)
+
+    def get_investments_by_user(self, user_id: str):
+        request = startup_pb2.GetInvestmentsByUserRequest(user_id=user_id)
+        return self.stub.GetInvestmentsByUser(request)
+
+    def get_investments_by_startup(self, startup_id: int):
+        request = startup_pb2.GetInvestmentsByStartupRequest(startup_id=startup_id)
+        return self.stub.GetInvestmentsByStartup(request)
 
     def delete_compaigns(self, campaign_id):
         request = startup_pb2.DeleteCompaignsRequest(campaign_id=campaign_id)
@@ -205,6 +221,10 @@ class StartupService:
     def get_startups_by_user(self, user_id: int):
         request = startup_pb2.GetStartupsByUserRequest(user_id=user_id)
         return self.stub.GetStartupsByUser(request)
+
+    def list_categories(self):
+        request = startup_pb2.ListCategoriesRequest()
+        return self.stub.ListCategories(request)
 
     def list_campaigns_by_startup(self, startup_id: int):
         request = startup_pb2.ListCampaignsByStartupRequest(startup_id=startup_id)

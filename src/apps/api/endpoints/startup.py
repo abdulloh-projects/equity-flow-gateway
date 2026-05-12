@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from apps.api.deps import get_current_user
+from apps.db import get_conn
 from apps.schemas.startup_schema import (
     CreateBankInfoRequest,
     CreateCompaignsRequest,
@@ -24,6 +25,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from google.protobuf.json_format import MessageToDict
 
 router = APIRouter(prefix="/startup", tags=["startup"])
+
+_startup_bank_info: dict[int, int] = {}
 
 
 @router.post("/create")
@@ -152,7 +155,17 @@ async def create_bank_info(
             account_number=request.account_number,
             receipant_name=request.receipant_name,
         )
-        return MessageToDict(result)
+        result_dict = MessageToDict(result)
+        bank_info_id = result_dict.get("data", {}).get("bank_info_id")
+        if bank_info_id:
+            bid = int(bank_info_id)
+            _startup_bank_info[request.startup_id] = bid
+            with get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO startup_bank_info (startup_id, bank_info_id) VALUES (?, ?)",
+                    (request.startup_id, bid),
+                )
+        return result_dict
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -225,6 +238,15 @@ async def delete_compaign_update(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/categories")
+async def list_categories():
+    try:
+        result = StartupService().list_categories()
+        return MessageToDict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/")
 async def list_startups(page: int = 1, limit: int = 9):
     try:
@@ -244,20 +266,41 @@ async def get_my_startups(user_id: str = Depends(get_current_user)):
 
 
 @router.get("/{startup_id}/campaigns")
-async def list_campaigns_by_startup(
-    startup_id: int, user_id: str = Depends(get_current_user)
-):
+async def list_campaigns_by_startup(startup_id: int):
     try:
         result = StartupService().list_campaigns_by_startup(startup_id=startup_id)
-        return MessageToDict(result)
+        return MessageToDict(result, always_print_fields_with_no_presence=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{startup_id}")
-async def get_startup(startup_id: int, user_id: str = Depends(get_current_user)):
+async def get_startup(startup_id: int):
     try:
         result = StartupService().get_startup(startup_id=startup_id)
+        return MessageToDict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{startup_id}/bank-info")
+async def get_bank_info_by_startup(
+    startup_id: int, user_id: str = Depends(get_current_user)
+):
+    try:
+        bank_info_id = _startup_bank_info.get(startup_id)
+        if not bank_info_id:
+            with get_conn() as conn:
+                row = conn.execute(
+                    "SELECT bank_info_id FROM startup_bank_info WHERE startup_id = ?",
+                    (startup_id,),
+                ).fetchone()
+                if row:
+                    bank_info_id = row["bank_info_id"]
+                    _startup_bank_info[startup_id] = bank_info_id
+        if not bank_info_id:
+            return {"success": False, "message": "No bank info found for this startup"}
+        result = StartupService().get_bank_info(bank_info_id=bank_info_id)
         return MessageToDict(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -3,6 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from apps.api.api import router as api_router
+from apps.db import init_db
 from decouple import config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +32,7 @@ async def _init_rag_background() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
-    # Fire-and-forget: don't block server startup
+    init_db()
     asyncio.create_task(_init_rag_background())
     yield
 
