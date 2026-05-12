@@ -2,7 +2,9 @@ FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
-COPY . .
+COPY equity-flow-gateway/src ./src
+COPY equity-flow-auth-grpc/protos/ src/external/equity-flow-auth/protos/
+COPY equity-flow-startup-grpc/protos/ src/external/equity-flow-startup/protos/
 
 RUN pip install --no-cache-dir grpcio-tools
 
@@ -12,7 +14,7 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY equity-flow-gateway/requirements.txt .
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
@@ -20,8 +22,8 @@ RUN pip install --upgrade pip && \
 
 COPY --from=builder /app/src ./src
 
-COPY tests ./tests
-COPY pytest.ini .
+COPY equity-flow-gateway/tests ./tests
+COPY equity-flow-gateway/pytest.ini .
 
 ENV PYTHONPATH=/app/src
 
