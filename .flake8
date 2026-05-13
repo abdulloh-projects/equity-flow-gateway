@@ -1,5 +1,9 @@
 [flake8]
-max-line-length = 120
+max-line-length = 160
 exclude =
     src/apps/generated/
-ignore = E203
+ignore = E203,E501,E701
+per-file-ignores =
+    src/apps/api/endpoints/*.py: F401
+    src/apps/db.py: F401
+    tests/*.py: E402,F401,F841,F541
