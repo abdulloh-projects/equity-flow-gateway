@@ -3,33 +3,51 @@ name: CI and Security Pipeline
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
   build-test-secure:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Check out gateway repository
         uses: actions/checkout@v4
+        with:
+          path: equity-flow-gateway
+
+      - name: Check out auth-grpc repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/equity-flow-auth-grpc
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          path: equity-flow-auth-grpc
+
+      - name: Check out startup-grpc repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/equity-flow-startup-grpc
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          path: equity-flow-startup-grpc
 
       - name: Build and Start Container
-        run: docker compose up -d --build
+        run: docker compose -f equity-flow-gateway/docker-compose.yml up -d --build
 
       - name: Install DevSecOps Tools in Container
-        run: docker compose exec -T api pip install flake8 bandit pip-audit
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api pip install flake8 bandit pip-audit
 
       - name: Run Linter
-        run: docker compose exec -T api flake8 . --count --show-source --statistics
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api flake8 . --count --show-source --statistics
 
       - name: Scan Dependencies
-        run: docker compose exec -T api pip-audit
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api pip-audit
 
       - name: Scan Source Code
-        run: docker compose exec -T api bandit -r . -f custom -s B101
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api bandit -r . -f custom -s B101
 
       - name: Run Unit Tests
-        run: docker compose exec -T api pytest
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api pytest
 
       - name: Stop Containers
         if: always()
-        run: docker compose down
+        run: docker compose -f equity-flow-gateway/docker-compose.yml down
