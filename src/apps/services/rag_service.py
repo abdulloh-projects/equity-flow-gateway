@@ -18,25 +18,71 @@ _OFF_TOPIC_REPLY = (
     "Please ask me something about investing, startups, campaigns, or how the platform works."
 )
 
-# Keywords that signal the message is about equity crowdfunding / the platform.
-# If NONE of these appear in the user's message, we refuse immediately.
+
 _EQUITY_KEYWORDS = {
-    "equity", "startup", "startups", "invest", "investor", "investors",
-    "investment", "campaign", "campaigns", "fund", "funding", "founder",
-    "founders", "raise", "capital", "crowdfund", "crowdfunding", "pitch",
-    "valuation", "revenue", "venture", "seed", "series", "portfolio",
-    "roi", "returns", "due diligence", "term sheet", "cap table",
-    "equity flow", "equityflow", "platform", "dashboard", "register",
-    "login", "sign up", "signup", "account", "bank info", "mfo",
-    "document", "api", "endpoint", "stock", "share", "shares",
-    "dividend", "ipo", "round", "angel", "pre-seed", "runway",
-    "burn rate", "gross margin", "active customers", "min investment",
+    "equity",
+    "startup",
+    "startups",
+    "invest",
+    "investor",
+    "investors",
+    "investment",
+    "campaign",
+    "campaigns",
+    "fund",
+    "funding",
+    "founder",
+    "founders",
+    "raise",
+    "capital",
+    "crowdfund",
+    "crowdfunding",
+    "pitch",
+    "valuation",
+    "revenue",
+    "venture",
+    "seed",
+    "series",
+    "portfolio",
+    "roi",
+    "returns",
+    "due diligence",
+    "term sheet",
+    "cap table",
+    "equity flow",
+    "equityflow",
+    "platform",
+    "dashboard",
+    "register",
+    "login",
+    "sign up",
+    "signup",
+    "account",
+    "bank info",
+    "mfo",
+    "document",
+    "api",
+    "endpoint",
+    "stock",
+    "share",
+    "shares",
+    "dividend",
+    "ipo",
+    "round",
+    "angel",
+    "pre-seed",
+    "runway",
+    "burn rate",
+    "gross margin",
+    "active customers",
+    "min investment",
 }
 
 
 def _is_equity_related(message: str) -> bool:
     text = message.lower()
     return any(kw in text for kw in _EQUITY_KEYWORDS)
+
 
 _SYSTEM_PROMPT = """You are the official assistant for **Equity Flow** — an equity crowdfunding platform that connects startups with investors.
 
@@ -66,8 +112,6 @@ class RAGService:
         self._embedder = OllamaEmbedder()
         self._store = VectorStore()
         self._loader = DocumentLoader()
-
-    # ── Knowledge-base lifecycle ──────────────────────────────────────────────
 
     def initialize_knowledge_base(self, force: bool = False) -> int:
         """
@@ -111,8 +155,6 @@ class RAGService:
         if not _kb_ready or self._store.is_empty():
             self.initialize_knowledge_base()
 
-    # ── Chat ─────────────────────────────────────────────────────────────────
-
     def chat(
         self,
         message: str,
@@ -139,7 +181,11 @@ class RAGService:
         if not _is_equity_related(message):
             if session_id is None:
                 session_id = str(uuid.uuid4())
-            return {"response": _OFF_TOPIC_REPLY, "session_id": session_id, "sources": []}
+            return {
+                "response": _OFF_TOPIC_REPLY,
+                "session_id": session_id,
+                "sources": [],
+            }
 
         self._ensure_ready()
 
@@ -156,20 +202,16 @@ class RAGService:
             f"[{doc['title']}]\n{doc['text']}" for doc in relevant
         )
 
-        # 2. Build message list for the LLM
         messages: List[Dict] = [
             {"role": "system", "content": _SYSTEM_PROMPT.format(context=context)}
         ]
-        # Include last 6 turns (3 exchanges) for context window efficiency
         messages.extend(history[-6:])
         messages.append({"role": "user", "content": message})
 
-        # 3. Generate
         logger.debug("Calling %s with %d messages", self.llm_model, len(messages))
         raw = self._llm.chat(model=self.llm_model, messages=messages)
         reply: str = raw.message.content
 
-        # 4. Persist history (cap at 20 messages ~10 exchanges)
         history.append({"role": "user", "content": message})
         history.append({"role": "assistant", "content": reply})
         if len(history) > 20:
@@ -192,8 +234,8 @@ class RAGService:
         if not _is_equity_related(message):
             if session_id is None:
                 session_id = str(uuid.uuid4())
-            yield (_OFF_TOPIC_REPLY, session_id, None)   # emit as a token
-            yield ("", session_id, [])                    # then the done sentinel
+            yield (_OFF_TOPIC_REPLY, session_id, None)  # emit as a token
+            yield ("", session_id, [])  # then the done sentinel
             return
 
         self._ensure_ready()
@@ -222,7 +264,6 @@ class RAGService:
             full_reply += token
             yield (token, session_id, None)
 
-        # Persist and emit final sentinel
         history.append({"role": "user", "content": message})
         history.append({"role": "assistant", "content": full_reply})
         if len(history) > 20:
@@ -230,8 +271,6 @@ class RAGService:
 
         sources = sorted({doc["source"] for doc in relevant})
         yield ("", session_id, sources)
-
-    # ── Session management ────────────────────────────────────────────────────
 
     def clear_session(self, session_id: str) -> bool:
         """Delete conversation history for *session_id*. Returns True if found."""

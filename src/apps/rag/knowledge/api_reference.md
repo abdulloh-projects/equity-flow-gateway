@@ -4,7 +4,7 @@
 
 This document provides a complete reference for all REST API endpoints exposed by the Equity Flow API gateway. All requests and responses use JSON. Protected endpoints require the `Authorization: Bearer <access_token>` header obtained after login.
 
-**Base URL:** `https://api.equityflow.io` (or your configured gateway host)
+**Base URL:** `https://api.equityflow.uz` (or your configured gateway host)
 
 **Content-Type:** All request bodies must use `Content-Type: application/json`.
 
