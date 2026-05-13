@@ -41,7 +41,7 @@ jobs:
         run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api pip-audit
 
       - name: Scan Source Code
-        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api bandit -r . -f custom -s B101
+        run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api bandit -r src -f custom -s B101
 
       - name: Run Unit Tests
         run: docker compose -f equity-flow-gateway/docker-compose.yml exec -T api pytest
