@@ -275,7 +275,7 @@ async def list_campaigns_by_startup(startup_id: int):
 
 
 @router.get("/{startup_id}")
-async def get_startup(startup_id: int):
+async def get_startup(startup_id: int, user_id: str = Depends(get_current_user)):
     try:
         result = StartupService().get_startup(startup_id=startup_id)
         return MessageToDict(result)
