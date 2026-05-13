@@ -20,14 +20,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/equity-flow-auth-grpc
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
           path: equity-flow-auth-grpc
 
       - name: Check out startup-grpc repository
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/equity-flow-startup-grpc
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
           path: equity-flow-startup-grpc
 
       - name: Build and Start Container
