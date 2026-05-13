@@ -24,6 +24,7 @@ COPY --from=builder /app/src ./src
 
 COPY equity-flow-gateway/tests ./tests
 COPY equity-flow-gateway/pytest.ini .
+COPY equity-flow-gateway/.flake8 .
 
 ENV PYTHONPATH=/app/src
 

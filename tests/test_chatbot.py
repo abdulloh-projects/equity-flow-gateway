@@ -460,7 +460,7 @@ class TestRAGServiceChat:
     def test_chat_calls_llm_with_system_prompt(self):
         svc, _, _, mock_llm = self._make_service_ready()
         with patch(f"{RAG_SVC}._kb_ready", True):
-            svc.chat("test")
+            svc.chat("How does equity investment work?")
         call_messages = mock_llm.chat.call_args.kwargs["messages"]
         sys_msgs = [m for m in call_messages if m["role"] == "system"]
         assert len(sys_msgs) == 1
@@ -469,14 +469,14 @@ class TestRAGServiceChat:
     def test_chat_embeds_the_query(self):
         svc, _, mock_embedder, _ = self._make_service_ready()
         with patch(f"{RAG_SVC}._kb_ready", True):
-            svc.chat("test question")
-        mock_embedder.embed.assert_called_once_with("test question")
+            svc.chat("How does equity investment work?")
+        mock_embedder.embed.assert_called_once_with("How does equity investment work?")
 
     def test_clear_session_removes_history(self):
         svc, _, _, _ = self._make_service_ready()
         sid = "my-session"
         with patch(f"{RAG_SVC}._kb_ready", True):
-            svc.chat("hi", session_id=sid)
+            svc.chat("How does equity investment work?", session_id=sid)
         assert svc.clear_session(sid) is True
 
     def test_clear_session_returns_false_for_unknown_id(self):
