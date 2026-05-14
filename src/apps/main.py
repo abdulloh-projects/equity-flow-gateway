@@ -19,7 +19,6 @@ async def _init_rag_background() -> None:
     the chatbot will retry on the first request.
     """
     try:
-        # Import lazily so tests that don't need Ollama/Chroma still work
         from apps.services.rag_service import RAGService
 
         count = await asyncio.to_thread(RAGService().initialize_knowledge_base)

@@ -49,3 +49,45 @@ jobs:
       - name: Stop Containers
         if: always()
         run: docker compose -f equity-flow-gateway/docker-compose.yml down
+
+  deploy:
+    needs: build-test-secure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out gateway repository
+        uses: actions/checkout@v4
+        with:
+          path: equity-flow-gateway
+
+      - name: Check out auth-grpc repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/equity-flow-auth-grpc
+          path: equity-flow-auth-grpc
+
+      - name: Check out startup-grpc repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/equity-flow-startup-grpc
+          path: equity-flow-startup-grpc
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: equity-flow-gateway/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/equity-flow-gateway:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/equity-flow-gateway:${{ github.sha }}
+
+      - name: Trigger Render deploy
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
